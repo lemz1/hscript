@@ -327,6 +327,7 @@ class Checker {
 	var currentFunType : TType;
 	var isCompletion : Bool;
 	var allowDefine : Bool;
+	var hasReturn : Bool;
 	public var allowAsync : Bool;
 	public var allowReturn : Null<TType>;
 	public var allowGlobalsDefine : Bool;
@@ -337,10 +338,10 @@ class Checker {
 		this.types = types;
 	}
 
-	public function setGlobals( cl : CClass ) {
+	public function setGlobals( cl : CClass, allowPrivate = false ) {
 		while( true ) {
 			for( f in cl.fields )
-				if( f.isPublic )
+				if( f.isPublic || allowPrivate )
 					setGlobal(f.name, f.params.length == 0 ? f.t : TLazy(function() return apply(f.t,f.params,[for( i in 0...f.params.length) makeMono()])));
 			if( cl.superClass == null )
 				break;
@@ -365,6 +366,10 @@ class Checker {
 
 	public function getGlobals() {
 		return globals;
+	}
+
+	public dynamic function onTopDownEnum( en : CEnum, field : String ) {
+		return false;
 	}
 
 	function typeArgs( args : Array<Argument>, pos : Expr ) {
@@ -709,7 +714,7 @@ class Checker {
 					default: throw "assert";
 					}
 				}
-				if( !typeEq(f1.t,f2.t) )
+				if( !typeEq(apply(f1.t,cl1.params,pl1),f2.t) )
 					return false;
 			}
 			return true;
@@ -815,6 +820,9 @@ class Checker {
 		case TAnon(fl):
 			for( f in fl )
 				fields.push({ name : f.name, t : f.t });
+		case TFun(args, ret):
+			if( isCompletion )
+				fields.push({ name : "bind", t : TFun(args,TVoid) });
 		default:
 		}
 		return fields;
@@ -956,7 +964,19 @@ class Checker {
 			case "trace":
 				return TDynamic;
 			default:
-				if( isCompletion) return TDynamic;
+				switch( withType ) {
+				case WithType(et = TEnum(e, args)):
+					for( c in e.constructors )
+						if( c.name == v ) {
+							if( onTopDownEnum(e,v) ) {
+								var ct = c.args == null ? et : TFun(c.args, et);
+								return apply(ct, e.params, args);
+							}
+							break;
+						}
+				default:
+				}
+				if( isCompletion ) return TDynamic;
 				error("Unknown identifier "+v, expr);
 			}
 		case EBlock(el):
@@ -977,7 +997,29 @@ class Checker {
 		case EParent(e):
 			return typeExpr(e,withType);
 		case ECall(e, params):
-			var ft = typeExpr(e, Value);
+			switch( edef(e) ) {
+			case EField(val, "bind"):
+				var ft = typeExpr(val, Value);
+				switch( ft ) {
+				case TFun(args,ret):
+					var remainArgs = args.copy();
+					for( p in params ) {
+						var a = remainArgs.shift();
+						if( a == null ) {
+							error("Too many arguments", p);
+							return TFun([], ret);
+						}
+						typeExprWith(p, a.t);
+					}
+					return TFun(remainArgs, ret);
+				default:
+				}
+			default:
+			}
+			var ft = typeExpr(e, switch( [edef(e),withType] ) {
+				case [EIdent(_),WithType(TEnum(_))]: withType;
+				default: Value;
+			});
 			switch( follow(ft) ) {
 			case TFun(args, ret):
 				for( i in 0...params.length ) {
@@ -1047,6 +1089,7 @@ class Checker {
 			return TVoid;
 		case EReturn(v):
 			var et = v == null ? TVoid : typeExpr(v, allowReturn == null ? Value : WithType(allowReturn));
+			hasReturn = true;
 			if( allowReturn == null )
 				error("Return not allowed here", expr);
 			else
@@ -1089,8 +1132,10 @@ class Checker {
 			var locals = saveLocals();
 			var oldRet = allowReturn;
 			var oldGDef = allowDefine;
+			var oldHasRet = hasReturn;
 			allowReturn = tret;
 			allowDefine = false;
+			hasReturn = false;
 			var withArgs = null;
 			if( name != null && !withType.match(WithType(follow(_) => TFun(_))) ) {
 				var ev = events.get(name);
@@ -1115,8 +1160,11 @@ class Checker {
 			if( withArgs != null && targs.length < withArgs.length )
 				error("Missing "+(withArgs.length - targs.length)+" arguments ("+[for( i in targs.length...withArgs.length ) typeStr(withArgs[i].t)].join(",")+")", expr);
 			typeExpr(body,NoValue);
+			if( !hasReturn && !tryUnify(tret, TVoid) )
+				error("Missing return "+typeStr(tret), expr);
 			allowDefine = oldGDef;
 			allowReturn = oldRet;
+			hasReturn = oldHasRet;
 			this.locals = locals;
 			if( ft == null ) {
 				ft = TFun(targs, tret);
@@ -1284,7 +1332,8 @@ class Checker {
 			case TAbstract(a, args):
 				// special case : we allow unconditional access
 				// to an abstract iterator() underlying value (eg: ArrayProxy)
-				ft = getField(apply(a.t,a.params,args),"iterator",it);
+				var at = apply(a.t,a.params,args);
+				return getIteratorType(it, at);
 			default:
 			}
 		if( ft != null )

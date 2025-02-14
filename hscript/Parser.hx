@@ -601,10 +601,17 @@ class Parser {
 				tk = token();
 			}
 			var e = null;
-			if( Type.enumEq(tk,TOp("=")) )
-				e = parseExpr();
-			else
-				push(tk);
+
+			switch (tk)
+			{
+				case TOp("="): e = parseExpr();
+				case TOp(_): unexpected(tk);
+				case TComma | TSemicolon: push(tk);
+				// Above case should be enough but semicolon is not mandatory after }
+				case _ if (t != null): push(tk);
+				default: unexpected(tk);
+			}
+
 			mk(EVar(ident,t,e),p1,(e == null) ? tokenMax : pmax(e));
 		case "while":
 			var econd = parseExpr();
@@ -1393,6 +1400,8 @@ class Parser {
 						}
 						if( pow == null )
 							invalidChar(char);
+						if( exp == 0 )
+							exp = 10;
 						return TConst(CFloat((Math.pow(10, pow) / exp) * n * 10));
 					case ".".code:
 						if( exp > 0 ) {
