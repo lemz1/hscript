@@ -105,7 +105,7 @@ class Parser {
 
 	public function new() {
 		line = 1;
-		opChars = "+*/-=!><&|^%~";
+		opChars = "+*/-=!><&|^%~?";
 		identChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_";
 		var priorities = [
 			["%"],
@@ -117,6 +117,7 @@ class Parser {
 			["..."],
 			["&&"],
 			["||"],
+			["??"],
 			["=","+=","-=","*=","/=","%=","<<=",">>=",">>>=","|=","&=","^=","=>"],
 			["->"]
 		];
@@ -125,7 +126,7 @@ class Parser {
 		for( i in 0...priorities.length )
 			for( x in priorities[i] ) {
 				opPriority.set(x, i);
-				if( i == 9 ) opRightAssoc.set(x, true);
+				if( i == 10 ) opRightAssoc.set(x, true);
 			}
 		for( x in ["!", "++", "--", "~"] ) // unary "-" handled in parser directly!
 			opPriority.set(x, x == "++" || x == "--" ? -1 : -2);
@@ -1478,6 +1479,8 @@ class Parser {
 				char = readChar();
 				if( char == ".".code )
 					return TQuestionDot;
+				if( char == "?".code )
+					return TOp("??");
 				this.char = char;
 				return TQuestion;
 			case ":".code: return TDoubleDot;
