@@ -511,14 +511,42 @@ class Interp {
 		case ETernary(econd,e1,e2):
 			return if( expr(econd) == true ) expr(e1) else expr(e2);
 		case ESwitch(e, cases, def):
+			var old:Int = declared.length;
 			var val : Dynamic = expr(e);
 			var match = false;
 			for( c in cases ) {
-				for( v in c.values )
-					if( expr(v) == val ) {
-						match = true;
-						break;
+				for( v in c.values ) {
+					switch ( Tools.expr(v) ) {
+					case ECall(e, params):
+						switch ( Tools.expr(e) ) {
+						case EField(_, f):
+							var valStr:String = cast val;
+							valStr = valStr.substring(0, valStr.indexOf("("));
+							if (valStr == f) {
+								var valParams = Type.enumParameters(val);
+								for (i => p in params) {
+									switch ( Tools.expr(p) ) {
+									case EIdent(n):
+										declared.push({
+											n: n,
+											old: {r: locals.get(n)}
+										});
+										locals.set(n, {r: valParams[i]});
+									default:
+									}
+								}
+								match = true;
+								break;
+							}
+						default:
+						}
+					default:
+						if( expr(v) == val ) {
+							match = true;
+							break;
+						}
 					}
+				}
 				if( match ) {
 					val = expr(c.expr);
 					break;
@@ -526,6 +554,7 @@ class Interp {
 			}
 			if( !match )
 				val = def == null ? null : expr(def);
+			restore(old);
 			return val;
 		case EMeta(_, _, e):
 			return expr(e);

@@ -122,6 +122,7 @@ enum ModuleDecl {
 	DImport( path : Array<String>, ?everything : Bool );
 	DClass( c : ClassDecl );
 	DTypedef( c : TypeDecl );
+	DEnum( e : EnumDecl );
 }
 
 typedef ModuleType = {
@@ -136,6 +137,21 @@ typedef ClassDecl = {> ModuleType,
 	var implement : Array<CType>;
 	var fields : Array<FieldDecl>;
 	var isExtern : Bool;
+}
+
+typedef EnumDecl = {
+	var name: String;
+	var fields : Array<EnumFieldDecl>;
+}
+
+typedef EnumFieldDecl = {
+	var name : String;
+	var args : Array<EnumArgDecl>;
+}
+
+typedef EnumArgDecl = {
+	var name : String;
+	var type : Null<CType>;
 }
 
 typedef TypeDecl = {> ModuleType,

@@ -1188,6 +1188,20 @@ class Parser {
 				isPrivate : isPrivate,
 				t : t,
 			});
+		case "enum":
+			var name = getIdent();
+			
+			var fields = [];
+			ensure(TBrOpen);
+			while( !maybe(TBrClose) ) {
+				fields.push(parseEnumField());
+				ensure(TSemicolon);
+			}
+
+			return DEnum({
+				name: name,
+				fields: fields
+			});
 		default:
 			unexpected(TId(ident));
 		}
@@ -1264,6 +1278,31 @@ class Parser {
 			}
 		}
 		return null;
+	}
+
+	function parseEnumField() : EnumFieldDecl {
+		var name = getIdent();
+
+		var args = [];
+		if( maybe(TPOpen) ) {
+			while ( !maybe(TPClose) )
+				args.push(parseEnumArg());
+		}
+		
+		return {
+			name: name,
+			args: args
+		};
+	}
+
+	function parseEnumArg() : EnumArgDecl {
+		var name = getIdent();
+		var type = maybe(TDoubleDot) ? parseType() : null;
+
+		return {
+			name: name,
+			type: type
+		};
 	}
 
 	// ------------------------ lexing -------------------------------
