@@ -425,7 +425,7 @@ class Async {
 			return toCps(e, rest, exit);
 		//case EDoWhile(_), ETry(_), ECall(_):
 		default:
-			throw "Unsupported async expression " + Printer.toString(e);
+			throw "Unsupported async expression " + Printer.quicktoString(e);
 		}
 	}
 

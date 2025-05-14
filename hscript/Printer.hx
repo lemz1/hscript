@@ -325,7 +325,7 @@ class Printer {
 		}
 	}
 
-	public static function toString( e : Expr ) {
+	public static function quicktoString( e : Expr ) {
 		return new Printer().exprToString(e);
 	}
 
