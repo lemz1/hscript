@@ -67,6 +67,7 @@ enum Expr {
 	EDoWhile( cond : Expr, e : Expr);
 	EMeta( name : String, args : Array<Expr>, e : Expr );
 	ECheckType( e : Expr, t : CType );
+	EForGen( it : Expr, e : Expr );
 }
 
 typedef Argument = { name : String, ?t : CType, ?opt : Bool, ?value : Expr };
@@ -80,6 +81,7 @@ enum CType {
 	CTParent( t : CType );
 	CTOpt( t : CType );
 	CTNamed( n : String, t : CType );
+	CTExpr( e : Expr ); // for type parameters only
 }
 
 #if hscriptPos
